@@ -142,64 +142,133 @@ class Board:
 
     def recognize_digits(self):
         cells = self.grid_numbers()
+        board_of_digits = []
         digit_contour = []
+        digit_template = []
         for i in range(1, 10):
-            template = cv.imread(r'C:\Users\Pablito\Desktop\sudoku\templates\number'+str(i)+'.jpg', 0)
+            template = cv.imread(r'.\templates\number'+str(i)+'.jpg', 0)
+            if template is None:
+                raise ValueError('uncorrect path to image')
+            tp = np.copy(template)
             _, template = cv.threshold(template, 120, 255, 0)
-            template = cv.GaussianBlur(template, (7, 7), cv.BORDER_DEFAULT)
+            template = cv.medianBlur(template, 5, cv.BORDER_DEFAULT)
             template = cv.adaptiveThreshold(template, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 11, 4)
-            contours, _ = cv.findContours(template, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
+
+            contours, _ = cv.findContours(template, cv.RETR_CCOMP, cv.CHAIN_APPROX_NONE)
             max_contour = self.find_max_contour(contours)
             digit_contour.append(max_contour)
 
-            def centroid_height_ratio(max_contour):
-                my = max(max_contour[:, 0, 1])
-                mx = max_contour[np.argmax(max_contour[:, 0, 0]), 0, 0]
-                ny = min(max_contour[:, 0, 1])
-                nx = max_contour[np.argmin(max_contour[:, 0, 0]), 0, 0]
+            masktemp = np.zeros_like(tp)
+            for contour in contours:
+                cv.drawContours(masktemp, [contour], -1, color=(255, 255, 255), thickness=1)
+            # cv.imshow('maska', masktemp)
+            # cv.waitKey(0)
+            digit_template.append(masktemp)
 
-                mask = np.zeros_like(template)
-                cv.drawContours(mask, [max_contour], -1, color=(255, 255, 255), thickness=1)
-                # cv.imshow('maska', mask)
-                # cv.waitKey(0)
+        def end_points_of_contour(max_contour):
+            my = max(max_contour[:, 0, 1])
+            mx = max_contour[np.argmax(max_contour[:, 0, 0]), 0, 0]
+            ny = min(max_contour[:, 0, 1])
+            nx = max_contour[np.argmin(max_contour[:, 0, 0]), 0, 0]
 
-                M = cv.moments(mask)
-                cx = int(M["m10"] / M["m00"])
-                cy = int(M["m01"] / M["m00"])
-                # cv.circle(mask, (cx, cy), 5, 255, -1)
-                # cv.circle(mask, (mx, my), 5, 255, -1)
-                # cv.circle(mask, (nx, ny), 5, 255, -1)
-                # cv.imshow('centroid', mask)
-                # cv.waitKey(0)
-                # print(f'{i}) - gora:{nx,ny} dol:{mx,my} centroid: {cx,cy}, ratio: {cy / abs(ny-my)}')
-                ratio = cy / abs(ny-my)
-                return ratio
+            # mask = np.zeros_like(template)
+            # cv.drawContours(mask, [max_contour], -1, color=(255, 255, 255), thickness=1)
+            # cv.imshow('maska', mask)
+            # cv.waitKey(0)
+
+            # M = cv.moments(mask)
+            # cx = int(M["m10"] / M["m00"])
+            # cy = int(M["m01"] / M["m00"])
+            # cv.circle(mask, (cx, cy), 5, 255, -1)
+            # cv.circle(mask, (mx, my), 5, 255, -1)
+            # cv.circle(mask, (nx, ny), 5, 255, -1)
+            # cv.imshow('centroid', mask)
+            # cv.waitKey(0)
+            # # gora:{nx,ny} dol:{mx,my} centroid: {cx,cy}, ratio: {cy / abs(ny-my)}')
+            # ratio = cy / abs(ny-my)
+            return my, mx, ny, nx
 
         for i in range(81):
             cells[i] = cv.resize(cells[i], (cells[i].shape[0]*3, cells[i].shape[1]*3), interpolation=cv.INTER_AREA)
             _, template = cv.threshold(cells[i], 120, 255, 0)
+            template = cv.medianBlur(template, 7, cv.BORDER_DEFAULT)
             template = cv.adaptiveThreshold(template, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 11, 4)
-
-            contours, _ = cv.findContours(template, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
+            # cv.imshow('template', template)
+            # cv.waitKey(0)
+            contours, _ = cv.findContours(template, cv.RETR_CCOMP, cv.CHAIN_APPROX_NONE)
             max_contour = self.find_max_contour(contours)
 
-            mask = np.zeros_like(template)
-            cv.drawContours(mask, [max_contour], -1, color=(255, 255, 255), thickness=1)
-            cv.imshow('maska', mask)
-            cv.waitKey(0)
+            image_of_max_contour = np.zeros_like(template)
+            cv.drawContours(image_of_max_contour, [max_contour], -1, color=(255, 255, 255), thickness=1)
 
-            score = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0}# ????? Bank of digits
-            for dig, contour in enumerate(digit_contour):
-                score[dig+1] = cv.matchShapes(max_contour, contour, 3, 0)
-            mina = min(score, key=score.get)
-            if score[mina] < 1:
-                if mina in [6, 8, 9] and score[mina] < 0.1:
-                    ratio = centroid_height_ratio(max_contour)
-                    if ratio > 0.9:
-                        mina = 9
-                    elif ratio < 0.85:
-                        mina = 6
-                print(mina)
+            maxy, maxx, miny, minx = end_points_of_contour(max_contour)
+            rows = np.linspace(minx, maxx, num=maxx-minx+1, dtype=np.uint8)
+            columns = np.linspace(miny, maxy, num=maxy-miny+1, dtype=np.uint8)
+
+            masktemp = np.zeros_like(template)
+            for contour in contours:
+                cv.drawContours(masktemp, [contour], -1, color=(255, 255, 255), thickness=1)
+            final = np.zeros_like(template)
+            final[columns[:, None], rows] = masktemp[columns[:, None], rows]
+            # cv.imshow('final', final)
+            # cv.waitKey(0)
+
+            score = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0} # ????? Bank of digits
+
+            for digit, contour in enumerate(digit_contour):
+                score[digit+1] = cv.matchShapes(max_contour, contour, 3, 0.0)
+            is_digit = min(score, key=score.get)
+            if score[is_digit] < 1:
+                if is_digit in [6, 8, 9]:
+                    contours, _ = cv.findContours(template, cv.RETR_CCOMP, cv.CHAIN_APPROX_NONE)
+                    if len(contours) == 10:
+                        is_digit = 8
+                    else:
+                        # output = np.zeros_like(template)
+                        circles = cv.HoughCircles(final, cv.HOUGH_GRADIENT, 1.6, 50)
+                        if circles is not None:
+                            circles = np.round(circles[0, :]).astype("int")
+                            for (x, y, r) in circles:
+                                ratio = abs(y-miny)/abs(maxy-miny)
+                                # cv.circle(output, (x, y), r, 255, 3)
+                                if ratio < 0.4:
+                                    is_digit = 9
+                                else:
+                                    is_digit = 6
+                        # cv.imshow('output', output)
+                        # cv.waitKey(0)
+                if is_digit in [2, 5]:
+                    is_digit = 5
+                    hough_lines = cv.HoughLines(image_of_max_contour, 1, 2 * np.pi / 180, 40)
+                    hough_img = np.zeros_like(template, dtype=np.uint8)
+                    if hough_lines is not None:
+                        for line in hough_lines:
+                            rho, theta = line[0]
+                            a = np.cos(theta)
+                            b = np.sin(theta)
+                            x0 = a * rho
+                            y0 = b * rho
+                            x1 = int(x0 + 1000 * (-b))
+                            y1 = int(y0 + 1000 * a)
+                            x2 = int(x0 - 1000 * (-b))
+                            y2 = int(y0 - 1000 * a)
+                            cv.line(hough_img, (x1, y1), (x2, y2), 255, 1)
+                        indices = hough_img.nonzero()
+                        maxy_hough = max(indices[0])
+                        miny_hough = min(indices[0])
+                        y_of_line = (maxy_hough+miny_hough)/2
+                        hough_ratio = (maxy-miny)/(maxy-y_of_line)
+                        if hough_ratio > 10:
+                            is_digit = 2
+                    # cv.imshow('hough', hough_img)
+                    # cv.waitKey(0)
+                board_of_digits.append(is_digit)
+            else:
+                board_of_digits.append(0)
+        print("TABLICA SUDOKU: ")
+        for n in range(0, 81, 9):
+            print(board_of_digits[n:n+9])
+
 
     def run(self):
         self.preparation()
@@ -212,15 +281,6 @@ class Board:
 
 
 if __name__ == '__main__':
-
-    # o1 = Board('s1.jpg')
-    # o1.run()
-
-    # o2 = Board('s2.jpg')
-    # o2.run()
-
-    # o3 = Board('s3.jpg')
-    # o3.run()
-
-    o4 = Board('s4.jpg')
+    jpg_name = input("Podaj nazwe zdjecia, np. 'sudoku.jpg': ")
+    o4 = Board(jpg_name)
     o4.run()
