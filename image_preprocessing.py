@@ -106,7 +106,6 @@ class Board:
 
         # Correcting the skewed perspective, real board aspect ratio is 58x63
         def correct_perspective(p_corners):
-            # TODO - uzależnić wspolrzedne new_corners od self.resized.shape()
             new_corners = np.array([[579, 629], [0, 629], [0, 0], [579, 0]])
             crn = np.array([[p_corners[0][1], p_corners[0][0]], [p_corners[1][1], p_corners[1][0]],
                             [p_corners[2][1], p_corners[2][0]], [p_corners[3][1], p_corners[3][0]]])
@@ -120,7 +119,6 @@ class Board:
         self.extracted_board = correct_perspective(corners)
         cv.imshow(self.name, self.resized)
         cv.imshow(self.name, self.extracted_board)
-        cv.waitKey(0)
 
     def grid_numbers(self):
         cropped_board = np.copy(self.extracted_board)
@@ -213,7 +211,7 @@ class Board:
             # cv.imshow('final', final)
             # cv.waitKey(0)
 
-            score = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0} # ????? Bank of digits
+            score = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0} # Bank of digits
 
             for digit, contour in enumerate(digit_contour):
                 score[digit+1] = cv.matchShapes(max_contour, contour, 3, 0.0)
@@ -268,6 +266,7 @@ class Board:
         print("TABLICA SUDOKU: ")
         for n in range(0, 81, 9):
             print(board_of_digits[n:n+9])
+        cv.waitKey(0)
 
 
     def run(self):
