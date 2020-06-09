@@ -23,6 +23,8 @@ class Board:
 
     def preparation(self):
         ori_img = cv.imread(self.name, 0)
+        if ori_img is None:
+            raise AttributeError(' Incorrect name of image')
         h = int(ori_img.shape[0] * 0.15)
         w = int(ori_img.shape[1] * 0.15)
         ori_img = cv.resize(ori_img, (w, h), interpolation=cv.INTER_AREA)
@@ -219,16 +221,16 @@ class Board:
             if score[is_digit] < 1:
                 if is_digit in [6, 8, 9]:
                     contours, _ = cv.findContours(template, cv.RETR_CCOMP, cv.CHAIN_APPROX_NONE)
-                    if len(contours) == 10:
+                    if score[is_digit] < 0.08:
                         is_digit = 8
                     else:
-                        # output = np.zeros_like(template)
+                        output = np.zeros_like(template)
                         circles = cv.HoughCircles(final, cv.HOUGH_GRADIENT, 1.6, 50)
                         if circles is not None:
                             circles = np.round(circles[0, :]).astype("int")
                             for (x, y, r) in circles:
                                 ratio = abs(y-miny)/abs(maxy-miny)
-                                # cv.circle(output, (x, y), r, 255, 3)
+                                cv.circle(output, (x, y), r, 255, 3)
                                 if ratio < 0.4:
                                     is_digit = 9
                                 else:
@@ -244,6 +246,8 @@ class Board:
                             rho, theta = line[0]
                             a = np.cos(theta)
                             b = np.sin(theta)
+                            if b == 0 or abs(a/b) > 1:
+                                break
                             x0 = a * rho
                             y0 = b * rho
                             x1 = int(x0 + 1000 * (-b))
@@ -256,8 +260,10 @@ class Board:
                         miny_hough = min(indices[0])
                         y_of_line = (maxy_hough+miny_hough)/2
                         hough_ratio = (maxy-miny)/(maxy-y_of_line)
-                        if hough_ratio > 10:
+                        if hough_ratio > 5:
                             is_digit = 2
+                    else:
+                        is_digit = 3
                     # cv.imshow('hough', hough_img)
                     # cv.waitKey(0)
                 board_of_digits.append(is_digit)
@@ -281,5 +287,5 @@ class Board:
 
 if __name__ == '__main__':
     jpg_name = input("Podaj nazwe zdjecia, np. 'sudoku.jpg': ")
-    o4 = Board(jpg_name)
-    o4.run()
+    o = Board(jpg_name)
+    o.run()
